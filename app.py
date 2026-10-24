@@ -26,8 +26,9 @@ MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]
 
 # Per-attempt cap. The google-genai==0.3.0 client exposes no timeout option, so its
 # internal 503 retries can run unbounded; wrapping each attempt caps one model's
-# worst case so the whole 3-model chain stays well under gunicorn's --timeout 120.
-PER_MODEL_TIMEOUT_S = 35
+# worst case. Budget contract: 3 attempts x 20s = ~60s must fit inside the ESP32
+# client's hard HTTPClient::setTimeout ceiling (uint16: max 65000 ms).
+PER_MODEL_TIMEOUT_S = 20
 _executor = ThreadPoolExecutor(max_workers=2)
 
 def _generate(model_name, image_bytes):
