@@ -2,6 +2,7 @@ import os
 import base64
 import json
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from flask import Flask, request, Response
 from google import genai
 from google.genai import types
@@ -22,6 +23,25 @@ Follow these absolute rules:
 # requests despite 2.5 appearing in the list). gemini-flash-latest is a stable
 # alias that always tracks the current flash generation.
 MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]
+
+# Per-attempt cap. The google-genai==0.3.0 client exposes no timeout option, so its
+# internal 503 retries can run unbounded; wrapping each attempt caps one model's
+# worst case so the whole 3-model chain stays well under gunicorn's --timeout 120.
+PER_MODEL_TIMEOUT_S = 35
+_executor = ThreadPoolExecutor(max_workers=2)
+
+def _generate(model_name, image_bytes):
+    return client.models.generate_content(
+        model=model_name,
+        contents=[
+            types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+            "Solve this."
+        ],
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            temperature=0.1
+        )
+    )
 
 @app.route('/ping', methods=['GET'])
 def ping():
@@ -51,17 +71,8 @@ def upload():
 
         for model_name in MODELS:
             try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[
-                        types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
-                        "Solve this."
-                    ],
-                    config=types.GenerateContentConfig(
-                        system_instruction=SYSTEM_PROMPT,
-                        temperature=0.1
-                    )
-                )
+                future = _executor.submit(_generate, model_name, image_bytes)
+                response = future.result(timeout=PER_MODEL_TIMEOUT_S)
                 clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
                 return Response(clean_text, mimetype='text/plain')
             except Exception as err:
