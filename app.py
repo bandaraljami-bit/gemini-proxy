@@ -17,12 +17,23 @@ Follow these absolute rules:
 
 # Pool of vision-capable Flash models to try sequentially on capacity/model errors.
 # Ordered newest-first; only models available to this API key (2.5-flash is blocked
-# for new accounts and 1.5-flash is retired - both return immediate 404s).
-MODELS = ["gemini-3.8-flash", "gemini-2.0-flash"]
+# for new accounts; 2.0-flash and 1.5-flash are retired - all return immediate 404s).
+MODELS = ["gemini-3.8-flash", "gemini-3.8-flash-lite"]
 
 @app.route('/ping', methods=['GET'])
 def ping():
     return "pong", 200
+
+@app.route('/models', methods=['GET'])
+def models():
+    """Diagnostic: list models this API key can actually use."""
+    try:
+        return Response(
+            "\n".join(m.name for m in client.models.list()),
+            mimetype='text/plain'
+        )
+    except Exception as e:
+        return str(e), 500
 
 @app.route('/upload', methods=['POST'])
 def upload():
