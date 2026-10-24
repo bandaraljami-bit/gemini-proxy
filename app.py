@@ -17,10 +17,11 @@ Follow these absolute rules:
 3. Insert manual line breaks (\n) every 18 characters so the text wraps correctly on a tiny screen.
 """
 
-# Pool of vision-capable Flash models to try sequentially on capacity/model errors.
-# Ordered newest-first; only models available to this API key (2.5-flash is blocked
-# for new accounts; 2.0-flash and 1.5-flash are retired - all return immediate 404s).
-MODELS = ["gemini-3.8-flash", "gemini-3.8-flash-lite"]
+# Pool of vision-capable Flash models to try sequentially, verified live against
+# this API key via GET /models (2.5-flash, 2.0-flash and 1.5-flash all 404 on
+# requests despite 2.5 appearing in the list). gemini-flash-latest is a stable
+# alias that always tracks the current flash generation.
+MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]
 
 @app.route('/ping', methods=['GET'])
 def ping():
