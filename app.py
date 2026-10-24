@@ -1,5 +1,7 @@
 import os
 import base64
+import json
+import urllib.request
 from flask import Flask, request, Response
 from google import genai
 from google.genai import types
@@ -28,10 +30,11 @@ def ping():
 def models():
     """Diagnostic: list models this API key can actually use."""
     try:
-        return Response(
-            "\n".join(m.name for m in client.models.list()),
-            mimetype='text/plain'
-        )
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={os.environ.get('GEMINI_API_KEY')}&pageSize=100"
+        with urllib.request.urlopen(url, timeout=30) as r:
+            payload = json.load(r)
+        names = "\n".join(m["name"] for m in payload.get("models", []))
+        return Response(names, mimetype='text/plain')
     except Exception as e:
         return str(e), 500
 
