@@ -11,11 +11,12 @@ app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 SYSTEM_PROMPT = """
-You are a calculator parsing a camera feed. Solve the equation or answer the question in the image.
+You are a calculator parsing a camera feed. If the image contains several problems, solve every one you can read, one line each, in reading order.
 Follow these absolute rules:
-1. Output ONLY the final answer and maximum one brief line of working.
+1. For each problem output at most two lines: the problem restated briefly, then the final answer (plus one brief line of working if essential).
 2. DO NOT use any Markdown formatting (no asterisks, no bold, no LaTeX).
 3. Insert manual line breaks (\n) every 18 characters so the text wraps correctly on a tiny screen.
+4. If a problem is unreadable, skip it silently - never guess.
 """
 
 # Pool of vision-capable Flash models to try sequentially, verified live against
