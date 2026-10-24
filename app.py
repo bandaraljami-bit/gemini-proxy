@@ -15,6 +15,11 @@ Follow these absolute rules:
 3. Insert manual line breaks (\n) every 18 characters so the text wraps correctly on a tiny screen.
 """
 
+# Pool of vision-capable Flash models to try sequentially on capacity/model errors.
+# Ordered newest-first; only models available to this API key (2.5-flash is blocked
+# for new accounts and 1.5-flash is retired - both return immediate 404s).
+MODELS = ["gemini-3.8-flash", "gemini-2.0-flash"]
+
 @app.route('/upload', methods=['POST'])
 def upload():
     try:
@@ -23,21 +28,30 @@ def upload():
             return "Error: No image provided", 400
 
         image_bytes = base64.b64decode(data['image'])
+        last_error = None
 
-        response = client.models.generate_content(
-            model='gemini-3.8-flash',
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
-                "Solve this."
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                temperature=0.1
-            )
-        )
+        for model_name in MODELS:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[
+                        types.Part.from_bytes(data=image_bytes, mime_type='image/jpeg'),
+                        "Solve this."
+                    ],
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.1
+                    )
+                )
+                clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
+                return Response(clean_text, mimetype='text/plain')
+            except Exception as err:
+                last_error = err
+                print(f"Model {model_name} failed: {err}. Attempting next model...")
+                continue
 
-        clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
-        return Response(clean_text, mimetype='text/plain')
+        # If all fallback models fail
+        return str(last_error), 500
 
     except Exception as e:
         return str(e), 500
