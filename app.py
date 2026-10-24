@@ -1,14 +1,34 @@
 import os
+import io
 import base64
 import json
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from flask import Flask, request, Response
+from PIL import Image, ImageOps, ImageEnhance
 from google import genai
 from google.genai import types
 
 app = Flask(__name__)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+# ---- Post-processing pipeline for ESP32-CAM frames ----
+# The device sensor cannot rotate (its only physical corrections are 180-degree
+# flips), so orientation/level normalization happens here, once, at the proxy.
+def _preprocess(image_bytes):
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img = ImageOps.exif_transpose(img)
+        img = img.rotate(90, expand=True)          # fix the camera's 90-deg CCW mounting
+        img = ImageOps.autocontrast(img, cutoff=1) # normalize white/black levels (blowout-safe)
+        w, h = img.size
+        img = img.crop((int(w*0.04), int(h*0.04), int(w*0.96), int(h*0.96)))  # trim vignette border
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=90)
+        return buf.getvalue()
+    except Exception:
+        # Unparseable frame: pass the original bytes through untouched
+        return image_bytes
 
 SYSTEM_PROMPT = """
 You are a calculator parsing a camera feed. If the image contains several problems, solve every one you can read, one line each, in reading order.
@@ -70,6 +90,7 @@ def upload():
             return "Error: No image provided", 400
 
         image_bytes = base64.b64decode(data['image'])
+        image_bytes = _preprocess(image_bytes)
         last_error = None
 
         for model_name in MODELS:
