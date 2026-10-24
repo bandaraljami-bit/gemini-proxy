@@ -81,10 +81,10 @@ def upload():
                 print(f"Model {model_name} failed: {err}. Falling back to next model...")
                 continue
 
-        return str(last_error), 500
+        return f"{type(last_error).__name__}: {last_error}", 500
 
     except Exception as e:
-        return str(e), 500
+        return f"{type(e).__name__}: {e}", 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
