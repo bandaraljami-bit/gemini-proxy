@@ -76,6 +76,10 @@ def upload():
             try:
                 future = _executor.submit(_generate, model_name, image_bytes)
                 response = future.result(timeout=PER_MODEL_TIMEOUT_S)
+                if not (response and response.text):
+                    # Model ran but produced no text (blocked/empty/unreadable
+                    # input). Treat as a model failure so fallback proceeds.
+                    raise RuntimeError(f"{model_name}: no text in response")
                 clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
                 return Response(clean_text, mimetype='text/plain')
             except Exception as err:
