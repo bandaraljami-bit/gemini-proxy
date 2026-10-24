@@ -22,13 +22,14 @@ Follow these absolute rules:
 # this API key via GET /models (2.5-flash, 2.0-flash and 1.5-flash all 404 on
 # requests despite 2.5 appearing in the list). gemini-flash-latest is a stable
 # alias that always tracks the current flash generation.
-MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-flash-latest"]
+MODELS = ["gemini-3.8-flash", "gemini-flash-latest"]
 
 # Per-attempt cap. The google-genai==0.3.0 client exposes no timeout option, so its
 # internal 503 retries can run unbounded; wrapping each attempt caps one model's
-# worst case. Budget contract: 3 attempts x 20s = ~60s must fit inside the ESP32
-# client's hard HTTPClient::setTimeout ceiling (uint16: max 65000 ms).
-PER_MODEL_TIMEOUT_S = 20
+# worst case. Budget contract: 2 attempts x 28s = ~56s must fit inside the ESP32
+# client's hard HTTPClient::setTimeout ceiling (uint16: max 65000 ms). During
+# demand-spike flapping, wider windows beat more fallback hops.
+PER_MODEL_TIMEOUT_S = 28
 _executor = ThreadPoolExecutor(max_workers=2)
 
 def _generate(model_name, image_bytes):
