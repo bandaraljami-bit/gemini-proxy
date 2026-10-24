@@ -20,6 +20,10 @@ Follow these absolute rules:
 # for new accounts and 1.5-flash is retired - both return immediate 404s).
 MODELS = ["gemini-3.8-flash", "gemini-2.0-flash"]
 
+@app.route('/ping', methods=['GET'])
+def ping():
+    return "pong", 200
+
 @app.route('/upload', methods=['POST'])
 def upload():
     try:
@@ -47,10 +51,9 @@ def upload():
                 return Response(clean_text, mimetype='text/plain')
             except Exception as err:
                 last_error = err
-                print(f"Model {model_name} failed: {err}. Attempting next model...")
+                print(f"Model {model_name} failed: {err}. Falling back to next model...")
                 continue
 
-        # If all fallback models fail
         return str(last_error), 500
 
     except Exception as e:
