@@ -6,7 +6,7 @@ import urllib.request
 import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from flask import Flask, request, Response
-from PIL import Image, ImageOps, ImageEnhance
+from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 from google import genai
 from google.genai import types
 
@@ -24,7 +24,12 @@ def _preprocess(image_bytes):
         # sheet's final positioning produce UPRIGHT frames; the old rotation
         # (correct for the original 90-degree-rotated mount) was turning
         # readable text sideways -> "No problem visible".
-        img = ImageOps.autocontrast(img, cutoff=1) # normalize white/black levels (blowout-safe)
+        # OCR-grade enhancement: the sensor's faint pencil strokes sit in a
+        # narrow gray band (esp. under a colored lamp cast); grayscale +
+        # aggressive contrast puts ink/paper into a separable luminance range.
+        img = img.convert('L')                      # grayscale: cast-immune luminance
+        img = ImageOps.autocontrast(img, cutoff=2)  # normalize levels
+        img = ImageEnhance.Contrast(img).enhance(3.0)  # push ink away from paper
         w, h = img.size
         img = img.crop((int(w*0.04), int(h*0.04), int(w*0.96), int(h*0.96)))  # trim vignette border
         buf = io.BytesIO()
