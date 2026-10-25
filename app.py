@@ -24,12 +24,11 @@ def _preprocess(image_bytes):
         # sheet's final positioning produce UPRIGHT frames; the old rotation
         # (correct for the original 90-degree-rotated mount) was turning
         # readable text sideways -> "No problem visible".
-        # OCR-grade enhancement: the sensor's faint pencil strokes sit in a
-        # narrow gray band (esp. under a colored lamp cast); grayscale +
-        # aggressive contrast puts ink/paper into a separable luminance range.
-        img = img.convert('L')                      # grayscale: cast-immune luminance
-        img = ImageOps.autocontrast(img, cutoff=2)  # normalize levels
-        img = ImageEnhance.Contrast(img).enhance(3.0)  # push ink away from paper
+        # NO grayscale/3x-contrast either: that combination clipped the faint
+        # pencil strokes to white (model-view proved: sheet rendered solid
+        # white, zero strokes visible = "no text" from every model). The
+        # verified x=2 / expansion solves all went through THIS mild version:
+        img = ImageOps.autocontrast(img, cutoff=1) # gentle level normalization only
         w, h = img.size
         img = img.crop((int(w*0.04), int(h*0.04), int(w*0.96), int(h*0.96)))  # trim vignette border
         buf = io.BytesIO()
