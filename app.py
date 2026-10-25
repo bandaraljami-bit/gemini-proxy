@@ -20,7 +20,10 @@ def _preprocess(image_bytes):
     try:
         img = Image.open(io.BytesIO(image_bytes))
         img = ImageOps.exif_transpose(img)
-        img = img.rotate(90, expand=True)          # fix the camera's 90-deg CCW mounting
+        # NO fixed 90-degree rotation anymore: the on-device hmirror + the
+        # sheet's final positioning produce UPRIGHT frames; the old rotation
+        # (correct for the original 90-degree-rotated mount) was turning
+        # readable text sideways -> "No problem visible".
         img = ImageOps.autocontrast(img, cutoff=1) # normalize white/black levels (blowout-safe)
         w, h = img.size
         img = img.crop((int(w*0.04), int(h*0.04), int(w*0.96), int(h*0.96)))  # trim vignette border
