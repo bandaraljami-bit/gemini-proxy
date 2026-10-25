@@ -52,7 +52,8 @@ Follow these absolute rules:
 # -> 2.5-flash -> 3.8-flash (request-verified solver). 2.5-flash is
 # request-verified to 404 on this key — a deterministic fast-fail hop (~1 s);
 # included in case Google re-enables it. Each hop is capped at
-# PER_MODEL_TIMEOUT_S so a stalled endpoint is abandoned within ~12 s instead of
+# PER_MODEL_TIMEOUT_S (=25 s): peaks need the larger inference window, and
+# the ESP32 retry stack re-fires the payload outside this window.
 # letting the SDK's internal 503 retries run 28 s+.
 MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.6-flash"]
 # Dashboard (ai.dev/rate-limit) verified 3.8-flash at 6/1000 RPM, 62/10,000 RPD on
@@ -69,7 +70,7 @@ MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.6-flash"]
 # The device retransmits its payload up to 3 times 15 s apart, so slow-but-real
 # solves beyond a single 12 s window are retried by the client rather than held
 # by a long server block.
-PER_MODEL_TIMEOUT_S = 12
+PER_MODEL_TIMEOUT_S = 25
 _executor = ThreadPoolExecutor(max_workers=2)
 
 def _generate(model_name, image_bytes):
