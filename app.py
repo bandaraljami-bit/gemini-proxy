@@ -39,18 +39,20 @@ Follow these absolute rules:
 4. If a problem is unreadable, skip it silently - never guess.
 """
 
-# Pool of vision-capable Flash models to try sequentially, verified live against
-# this API key via GET /models (2.5-flash, 2.0-flash and 1.5-flash all 404 on
-# requests despite 2.5 appearing in the list). gemini-flash-latest is a stable
-# alias that always tracks the current flash generation.
-MODELS = ["gemini-3.8-flash", "gemini-flash-latest"]
+# Pool per calibration-dashboard directive. Order: flash-latest (tracking alias)
+# -> 2.5-flash -> 3.8-flash (request-verified solver). 2.5-flash is
+# request-verified to 404 on this key — a deterministic fast-fail hop (~1 s);
+# included in case Google re-enables it. Each hop is capped at
+# PER_MODEL_TIMEOUT_S so a stalled endpoint is abandoned within ~12 s instead of
+# letting the SDK's internal 503 retries run 28 s+.
+MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-3.8-flash"]
 
-# Per-attempt cap. The google-genai==0.3.0 client exposes no timeout option, so its
-# internal 503 retries can run unbounded; wrapping each attempt caps one model's
-# worst case. Budget contract: 2 attempts x 28s = ~56s must fit inside the ESP32
-# client's hard HTTPClient::setTimeout ceiling (uint16: max 65000 ms). During
-# demand-spike flapping, wider windows beat more fallback hops.
-PER_MODEL_TIMEOUT_S = 28
+# Per-attempt cap: fast-failover directive (10-12 s per model; max 3 models =>
+# ~36 s worst-case chain, still inside the ESP32 client's 65 s HTTP ceiling).
+# The device retransmits its payload up to 3 times 15 s apart, so slow-but-real
+# solves beyond a single 12 s window are retried by the client rather than held
+# by a long server block.
+PER_MODEL_TIMEOUT_S = 12
 _executor = ThreadPoolExecutor(max_workers=2)
 
 def _generate(model_name, image_bytes):
