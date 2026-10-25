@@ -45,10 +45,11 @@ Follow these absolute rules:
 # included in case Google re-enables it. Each hop is capped at
 # PER_MODEL_TIMEOUT_S so a stalled endpoint is abandoned within ~12 s instead of
 # letting the SDK's internal 503 retries run 28 s+.
-MODELS = ["gemini-4-argon", "gemini-3.7-flash", "gemini-3.6-flash"]
-# 2.5-flash-lite now returns request-404 (removed); 3.5/3.6/3.8 flash generations
-# in a sustained model-wide "high demand" incident. 4-argon is the newest
-# generation on a different serving stack — tried first.
+MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.6-flash"]
+# Dashboard (ai.dev/rate-limit) verified 3.8-flash at 6/1000 RPM, 62/10,000 RPD on
+# tier 1 — quota is NOT the blocker for this endpoint. 4-argon dropped: its own
+# tiny tier-1 quota bucket 429s immediately (new-flagship caps). flash-latest
+# tracks the same family; 3.6-flash behind on a different serving silo.
 # Generation-diverse chain: 3.8-flash has been in sustained "high demand" 503
 # since yesterday evening (paid tier 1 affected too — model-level overload, NOT
 # key/QoS). 3.6/3.5 generations are separate serving silos; 2.5-flash-lite as
