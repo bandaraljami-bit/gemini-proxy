@@ -3,6 +3,7 @@ import io
 import base64
 import json
 import urllib.request
+import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from flask import Flask, request, Response
 from PIL import Image, ImageOps, ImageEnhance
@@ -103,24 +104,33 @@ def upload():
         image_bytes = _preprocess(image_bytes)
         hop_errors = []
 
-        for model_name in MODELS:
-            try:
-                future = _executor.submit(_generate, model_name, image_bytes)
-                response = future.result(timeout=PER_MODEL_TIMEOUT_S)
-                if not (response and response.text):
-                    # Model ran but produced no text (blocked/empty/unreadable
-                    # input). Treat as a model failure so fallback proceeds.
-                    raise RuntimeError("no text in response")
-                clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
-                return Response(clean_text, mimetype='text/plain')
-            except Exception as err:
-                hop_errors.append(f"{model_name}: {type(err).__name__}: {err}")
-                print(f"Model {model_name} failed: {err}. Falling back to next model...")
-                continue
+        # ---- Parallel model race ----
+        # All pool models are submitted CONCURRENTLY; the first one that returns
+        # usable text wins the response. Failover latency = min(model latencies)
+        # instead of the serial sum — a stalled/stormed generation never blocks
+        # the others. Losers are cancelled; their threads idle out harmlessly.
+        futures = {m: _executor.submit(_generate, m, image_bytes) for m in MODELS}
 
-        # Return the full hop-by-hop inventory: a single last-error hides the
-        # pattern when Google is failing fleet-wide.
-        return " | ".join(hop_errors), 500
+        try:
+            for done_future in concurrent.futures.as_completed(
+                    list(futures.values()), timeout=PER_MODEL_TIMEOUT_S):
+                try:
+                    response = done_future.result()
+                    if response and response.text:
+                        clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
+                        return Response(clean_text, mimetype='text/plain')
+                    hop_errors.append("no text in response")
+                except Exception as err:
+                    hop_errors.append(f"{type(err).__name__}: {err}")
+                    print(f"Model failed: {err}. Race continues...")
+        except FutureTimeoutError:
+            for fut in futures.values():
+                fut.cancel()
+            hop_errors.append(f"all {len(futures)} models exceeded {PER_MODEL_TIMEOUT_S}s")
+            # Cancelled futures' threads may still be running; they idle out
+            # harmlessly and must NOT block this response.
+
+        return " | ".join(hop_errors) if hop_errors else "no model responded", 500
 
     except Exception as e:
         return f"{type(e).__name__}: {e}", 500
