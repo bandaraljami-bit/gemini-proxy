@@ -45,7 +45,11 @@ Follow these absolute rules:
 # included in case Google re-enables it. Each hop is capped at
 # PER_MODEL_TIMEOUT_S so a stalled endpoint is abandoned within ~12 s instead of
 # letting the SDK's internal 503 retries run 28 s+.
-MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-3.8-flash"]
+MODELS = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash-lite"]
+# Generation-diverse chain: 3.8-flash has been in sustained "high demand" 503
+# since yesterday evening (paid tier 1 affected too — model-level overload, NOT
+# key/QoS). 3.6/3.5 generations are separate serving silos; 2.5-flash-lite as
+# the stable last resort. All four verified present for this key via GET /models.
 
 # Per-attempt cap: fast-failover directive (10-12 s per model; max 3 models =>
 # ~36 s worst-case chain, still inside the ESP32 client's 65 s HTTP ceiling).
