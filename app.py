@@ -100,7 +100,7 @@ def upload():
 
         image_bytes = base64.b64decode(data['image'])
         image_bytes = _preprocess(image_bytes)
-        last_error = None
+        hop_errors = []
 
         for model_name in MODELS:
             try:
@@ -109,15 +109,17 @@ def upload():
                 if not (response and response.text):
                     # Model ran but produced no text (blocked/empty/unreadable
                     # input). Treat as a model failure so fallback proceeds.
-                    raise RuntimeError(f"{model_name}: no text in response")
+                    raise RuntimeError("no text in response")
                 clean_text = response.text.replace('**', '').replace('`', '').replace('*', '').strip()
                 return Response(clean_text, mimetype='text/plain')
             except Exception as err:
-                last_error = err
+                hop_errors.append(f"{model_name}: {type(err).__name__}: {err}")
                 print(f"Model {model_name} failed: {err}. Falling back to next model...")
                 continue
 
-        return f"{type(last_error).__name__}: {last_error}", 500
+        # Return the full hop-by-hop inventory: a single last-error hides the
+        # pattern when Google is failing fleet-wide.
+        return " | ".join(hop_errors), 500
 
     except Exception as e:
         return f"{type(e).__name__}: {e}", 500
